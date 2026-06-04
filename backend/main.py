@@ -1,21 +1,50 @@
 import os
 
-from fastapi import Cookie, FastAPI, HTTPException, Response
+from fastapi import Cookie, Depends, FastAPI, HTTPException, Response
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from auth import VALID_PASSWORD, VALID_USERNAME, create_token, verify_token
+from crud import (
+    board_to_dict,
+    create_card,
+    delete_card,
+    get_board,
+    move_card,
+    rename_column,
+    update_card,
+)
+from database import get_db, init_db
 
 app = FastAPI()
 
 COOKIE_NAME = "session"
 
 
+@app.on_event("startup")
+def startup():
+    init_db()
+
+
+# --- Auth helpers ---
+
 class LoginRequest(BaseModel):
     username: str
     password: str
 
+
+def current_user(session: str | None = Cookie(default=None)) -> str:
+    if not session:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    username = verify_token(session)
+    if not username:
+        raise HTTPException(status_code=401, detail="Invalid session")
+    return username
+
+
+# --- Auth routes ---
 
 @app.get("/api/health")
 def health():
@@ -38,14 +67,105 @@ def logout(response: Response):
 
 
 @app.get("/api/auth/me")
-def me(session: str | None = Cookie(default=None)):
-    if not session:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    username = verify_token(session)
-    if not username:
-        raise HTTPException(status_code=401, detail="Invalid session")
+def me(username: str = Depends(current_user)):
     return {"username": username}
 
+
+# --- Board routes ---
+
+@app.get("/api/board")
+def get_board_route(username: str = Depends(current_user), db: Session = Depends(get_db)):
+    board = get_board(db, username)
+    return board_to_dict(board)
+
+
+class RenameColumnRequest(BaseModel):
+    title: str
+
+
+@app.put("/api/board/columns/{column_id}")
+def rename_column_route(
+    column_id: int,
+    body: RenameColumnRequest,
+    username: str = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    board = get_board(db, username)
+    col = rename_column(db, column_id, body.title, board)
+    if not col:
+        raise HTTPException(status_code=404, detail="Column not found")
+    return {"id": col.id, "title": col.title}
+
+
+class CreateCardRequest(BaseModel):
+    column_id: int
+    title: str
+    details: str = ""
+
+
+@app.post("/api/board/cards", status_code=201)
+def create_card_route(
+    body: CreateCardRequest,
+    username: str = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    board = get_board(db, username)
+    card = create_card(db, body.column_id, body.title, body.details, board)
+    if not card:
+        raise HTTPException(status_code=404, detail="Column not found")
+    return {"id": card.id, "title": card.title, "details": card.details, "position": card.position}
+
+
+class UpdateCardRequest(BaseModel):
+    title: str
+    details: str = ""
+
+
+@app.put("/api/board/cards/{card_id}")
+def update_card_route(
+    card_id: int,
+    body: UpdateCardRequest,
+    username: str = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    board = get_board(db, username)
+    card = update_card(db, card_id, body.title, body.details, board)
+    if not card:
+        raise HTTPException(status_code=404, detail="Card not found")
+    return {"id": card.id, "title": card.title, "details": card.details}
+
+
+@app.delete("/api/board/cards/{card_id}", status_code=204)
+def delete_card_route(
+    card_id: int,
+    username: str = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    board = get_board(db, username)
+    if not delete_card(db, card_id, board):
+        raise HTTPException(status_code=404, detail="Card not found")
+
+
+class MoveCardRequest(BaseModel):
+    column_id: int
+    position: int
+
+
+@app.put("/api/board/cards/{card_id}/move")
+def move_card_route(
+    card_id: int,
+    body: MoveCardRequest,
+    username: str = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    board = get_board(db, username)
+    card = move_card(db, card_id, body.column_id, body.position, board)
+    if not card:
+        raise HTTPException(status_code=404, detail="Card or column not found")
+    return {"id": card.id, "column_id": card.column_id, "position": card.position}
+
+
+# --- Static file serving ---
 
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 

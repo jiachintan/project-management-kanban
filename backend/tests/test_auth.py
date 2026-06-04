@@ -35,6 +35,5 @@ def test_me_authenticated(authed_client):
 def test_logout(authed_client):
     res = authed_client.post("/api/auth/logout")
     assert res.status_code == 200
-    # Session should be cleared after logout
     res = authed_client.get("/api/auth/me")
     assert res.status_code == 401
