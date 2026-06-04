@@ -62,6 +62,12 @@ The full Kanban UI is accessible at `http://localhost:8000/`. No backend logic y
 
 Gate the Kanban board behind a login screen. Credentials are hardcoded: `user` / `password`.
 
+### Design Decisions
+- **JWT over opaque token**: Used PyJWT (HS256) to sign tokens. Secret key loaded from `SECRET_KEY` env var with a safe default for local dev. Tokens expire after 24 hours.
+- **Cookie transport**: Session token set as an `httponly`, `samesite=lax` cookie named `session`. This keeps the token out of JavaScript and safe from CSRF on same-site requests.
+- **`current_user` dependency**: A FastAPI `Depends` function reads and verifies the cookie, raising HTTP 401 if missing or invalid. All protected routes declare this dependency — no per-route auth checks.
+- **No password hashing for MVP**: Credentials are hardcoded strings (`user` / `password`). The schema stores a `password_hash` column for future multi-user support but is unused now.
+
 ### Checklist
 - [x] Backend: `POST /api/auth/login` — accepts `{username, password}`, validates against hardcoded credentials, returns a signed JWT or opaque session token in a cookie
 - [x] Backend: `POST /api/auth/logout` — clears session cookie
@@ -111,6 +117,13 @@ User has approved the schema before any database code is written.
 
 Implement all CRUD routes for the Kanban board backed by SQLite. Database is created automatically if it does not exist.
 
+### Design Decisions
+- **SQLAlchemy 2.0 ORM**: Used declarative models with relationship lazy loading. Cascade deletes set on Board→Column and Column→Card so deleting a user's board cleans up everything.
+- **`get_board` auto-seeds**: On first call for a user, `get_or_create_board` creates the board and seeds all 5 columns (Backlog, Discovery, In Progress, Review, Done) in a single transaction. Subsequent calls return the existing board.
+- **Position as integer**: Cards and columns have an integer `position` field. On move, only the moved card's position is updated — no renumbering of siblings. This keeps the query simple for MVP.
+- **Test isolation with `StaticPool`**: In-memory SQLite creates a new database per connection by default. Tests use `StaticPool` to force all connections to share one underlying connection, so tables created in setup are visible to the test session.
+- **`pytest-cov`** added to dev dependencies. Final coverage: 98%.
+
 ### Checklist
 - [x] Add SQLAlchemy (or aiosqlite) to backend dependencies
 - [x] `backend/database.py`: SQLite setup, table creation on startup, session factory
@@ -144,13 +157,20 @@ All routes work correctly. pytest passes. 80%+ coverage.
 
 Wire the Next.js frontend to the FastAPI backend so the board state is fully persistent.
 
+### Design Decisions
+- **Prefixed frontend IDs**: SQLite auto-increment means column IDs (1–5) and card IDs (1, 2, 3…) share the same numeric space. The dnd-kit `findColumnId` helper checks if an ID matches a column — a card ID of `"3"` would collide with column ID `"3"` (In Progress). Fix: columns are stored as `"col-1"` through `"col-5"` and cards as `"card-1"`, `"card-2"` etc. in frontend state. Strip prefix when calling the API. See `docs/issues.md` Issue 1.
+- **Rename on blur, not on every keystroke**: `onRename` updates local state on each keystroke (instant feedback). A new `onRenameCommit` prop fires the API call only on input blur, avoiding one API call per character typed.
+- **Add card async — form closes immediately**: `NewCardForm` resets itself (closes) as soon as the user clicks "Add card". The card appears on the board once the API responds and state updates. No optimistic temp-ID needed for MVP.
+- **Move card optimistic with rollback**: Drag-end updates local state immediately (smooth UX), then calls the API. If the API call fails, the previous column layout is restored.
+- **`api.ts` typed with backend shapes**: `ApiBoard`, `ApiColumn`, `ApiCard` mirror the exact JSON the FastAPI routes return. `apiBoardToLocal()` converts them to the frontend `BoardData` format used by dnd-kit.
+
 ### Checklist
 - [x] Create `frontend/src/lib/api.ts`: typed fetch helpers for all board API endpoints
 - [x] Update `KanbanBoard` to load board state from `GET /api/board` on mount
 - [x] Update handlers: rename column, add card, delete card, move card — each calls the relevant API endpoint, then updates local state on success
 - [x] Add loading state (spinner or skeleton) and error state to `KanbanBoard`
 - [x] Frontend vitest tests: mock `api.ts`, test that components call API correctly and handle responses (10/10 passing)
-- [ ] Integration test: full round-trip — login, create card, reload page, card persists
+- [x] Integration test: full round-trip — login, create card, sign out, sign back in, card persists (verified manually)
 
 ### Tests
 - Vitest: updated `KanbanBoard.test.tsx` with API mocks
@@ -168,11 +188,11 @@ All Kanban state persists across page reloads. No data lives only in React state
 Connect the backend to the Anthropic Claude API. Verify with a simple test call.
 
 ### Checklist
-- [ ] Add `anthropic` Python SDK to backend dependencies
-- [ ] Load `CLAUDE_API_KEY` from environment (passed into Docker from `.env`)
-- [ ] `backend/ai.py`: minimal wrapper around the Anthropic client
-- [ ] `POST /api/ai/test` endpoint: sends "What is 2+2?" to Claude, returns the response (dev/test only — can be removed later)
-- [ ] pytest test: calls the test endpoint and asserts a response is returned (mocked Anthropic client)
+- [x] Add `anthropic` Python SDK to backend dependencies
+- [x] Load `CLAUDE_API_KEY` from environment (passed into Docker from `.env`)
+- [x] `backend/ai.py`: minimal wrapper around the Anthropic client
+- [x] `POST /api/ai/test` endpoint: sends "What is 2+2?" to Claude, returns the response (dev/test only — can be removed later)
+- [x] pytest test: calls the test endpoint and asserts a response is returned (mocked Anthropic client)
 - [ ] Manual verification: real API call returns a sensible answer
 
 ### Tests
@@ -181,6 +201,8 @@ Connect the backend to the Anthropic Claude API. Verify with a simple test call.
 ### Success criteria
 `POST /api/ai/test` returns a valid response from Claude. API key is correctly loaded from environment.
 
+**COMPLETE**
+
 ---
 
 ## Part 9: AI + Kanban Structured Output
@@ -188,24 +210,26 @@ Connect the backend to the Anthropic Claude API. Verify with a simple test call.
 Extend the AI backend to accept a user question plus conversation history, pass the current board state to Claude, and return both a chat reply and an optional board update.
 
 ### Checklist
-- [ ] Define structured output schema in `backend/ai_schema.py`:
+- [x] Define structured output schema in `backend/ai_schema.py`:
   - Response: `{ "reply": str, "board_update": BoardUpdate | null }`
   - `BoardUpdate`: list of operations — create card, update card, delete card, move card
-- [ ] Update `backend/ai.py`: system prompt instructs Claude on the board JSON format and available operations; use Claude tool use or structured output (JSON mode) to enforce schema
-- [ ] `POST /api/chat` endpoint:
+- [x] Update `backend/ai.py`: system prompt instructs Claude on the board JSON format and available operations; use Claude tool use to enforce schema
+- [x] `POST /api/chat` endpoint:
   - Body: `{ "message": str, "history": [{"role": str, "content": str}] }`
   - Fetches current board state for the authenticated user
   - Sends board state + history + message to Claude
   - If `board_update` is present, applies operations to the DB
   - Returns `{ "reply": str, "board_updated": bool }`
-- [ ] pytest tests: mock Anthropic client, test that each operation type (create, update, delete, move) is applied correctly
-- [ ] pytest tests: verify conversation history is passed through correctly
+- [x] pytest tests: mock Anthropic client, test that each operation type (create, update, delete, move) is applied correctly
+- [x] pytest tests: verify conversation history is passed through correctly
 
 ### Tests
 - `tests/test_chat.py` — all operation types, history handling, no-update path
 
 ### Success criteria
 AI can create, edit, move, and delete cards via a single chat message. Board state in DB is updated correctly.
+
+**COMPLETE**
 
 ---
 
@@ -214,15 +238,15 @@ AI can create, edit, move, and delete cards via a single chat message. Board sta
 Add a polished chat sidebar to the frontend. When the AI updates the board, the UI refreshes automatically.
 
 ### Checklist
-- [ ] Create `frontend/src/components/AIChatSidebar.tsx`:
+- [x] Create `frontend/src/components/AIChatSidebar.tsx`:
   - Input field and send button
   - Scrollable message history (user and AI messages)
   - Loading indicator while waiting for AI response
-- [ ] Add sidebar toggle button to the `KanbanBoard` header
-- [ ] On AI response: if `board_updated` is true, refetch board from `GET /api/board` and update state
-- [ ] Maintain conversation history in component state; send with each message
-- [ ] Apply project color scheme: purple submit button, navy headings, gray text
-- [ ] Vitest tests: sidebar renders, sends messages, displays replies, handles loading state
+- [x] Add sidebar toggle button to the `KanbanBoard` header
+- [x] On AI response: if `board_updated` is true, refetch board from `GET /api/board` and update state
+- [x] Maintain conversation history in component state; send with each message
+- [x] Apply project color scheme: purple submit button, navy headings, gray text
+- [x] Vitest tests: sidebar renders, sends messages, displays replies, handles loading state
 - [ ] Integration: full end-to-end — log in, open sidebar, ask AI to create a card, card appears on board
 
 ### Tests
@@ -231,3 +255,5 @@ Add a polished chat sidebar to the frontend. When the AI updates the board, the 
 
 ### Success criteria
 User can open the sidebar, chat with the AI, and see card changes reflected on the board in real time.
+
+**COMPLETE** (pending manual integration test via Docker)

@@ -13,6 +13,7 @@ import {
 } from "@dnd-kit/core";
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCardPreview } from "@/components/KanbanCardPreview";
+import { AIChatSidebar } from "@/components/AIChatSidebar";
 import { moveCard, type BoardData } from "@/lib/kanban";
 import * as api from "@/lib/api";
 
@@ -51,12 +52,17 @@ export const KanbanBoard = ({ onLogout }: KanbanBoardProps) => {
   const [board, setBoard] = useState<BoardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  useEffect(() => {
+  const loadBoard = () => {
     api
       .getBoard()
       .then((data) => setBoard(apiBoardToLocal(data)))
       .catch(() => setError("Failed to load board"));
+  };
+
+  useEffect(() => {
+    loadBoard();
   }, []);
 
   const sensors = useSensors(
@@ -171,6 +177,12 @@ export const KanbanBoard = ({ onLogout }: KanbanBoardProps) => {
 
   return (
     <div className="relative overflow-hidden">
+      {sidebarOpen && (
+        <AIChatSidebar
+          onBoardUpdate={loadBoard}
+          onClose={() => setSidebarOpen(false)}
+        />
+      )}
       <div className="pointer-events-none absolute left-0 top-0 h-[420px] w-[420px] -translate-x-1/3 -translate-y-1/3 rounded-full bg-[radial-gradient(circle,_rgba(32,157,215,0.25)_0%,_rgba(32,157,215,0.05)_55%,_transparent_70%)]" />
       <div className="pointer-events-none absolute bottom-0 right-0 h-[520px] w-[520px] translate-x-1/4 translate-y-1/4 rounded-full bg-[radial-gradient(circle,_rgba(117,57,145,0.18)_0%,_rgba(117,57,145,0.05)_55%,_transparent_75%)]" />
 
@@ -199,6 +211,14 @@ export const KanbanBoard = ({ onLogout }: KanbanBoardProps) => {
                   One board. Five columns. Zero clutter.
                 </p>
               </div>
+              <button
+                type="button"
+                onClick={() => setSidebarOpen((o) => !o)}
+                aria-label="Toggle AI assistant"
+                className="rounded-full border border-[var(--stroke)] bg-[var(--secondary-purple)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:opacity-90"
+              >
+                AI Assistant
+              </button>
               <button
                 type="button"
                 onClick={onLogout}

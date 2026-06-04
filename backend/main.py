@@ -6,6 +6,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from ai import ask, chat
+from ai_schema import CreateCardOp, DeleteCardOp, MoveCardOp, UpdateCardOp
 from auth import VALID_PASSWORD, VALID_USERNAME, create_token, verify_token
 from crud import (
     board_to_dict,
@@ -69,6 +71,55 @@ def logout(response: Response):
 @app.get("/api/auth/me")
 def me(username: str = Depends(current_user)):
     return {"username": username}
+
+
+# --- AI routes ---
+
+@app.post("/api/ai/test")
+def ai_test():
+    response = ask("What is 2+2?")
+    return {"response": response}
+
+
+class HistoryMessage(BaseModel):
+    role: str
+    content: str
+
+
+class ChatRequest(BaseModel):
+    message: str
+    history: list[HistoryMessage] = []
+
+
+@app.post("/api/chat")
+def chat_route(
+    body: ChatRequest,
+    username: str = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    board = get_board(db, username)
+    board_dict = board_to_dict(board)
+    history = [{"role": m.role, "content": m.content} for m in body.history]
+
+    result = chat(body.message, history, board_dict)
+
+    board_updated = False
+    if result.board_update:
+        for op in result.board_update.operations:
+            if isinstance(op, CreateCardOp):
+                create_card(db, op.column_id, op.title, op.details, board)
+                board_updated = True
+            elif isinstance(op, UpdateCardOp):
+                update_card(db, op.card_id, op.title, op.details, board)
+                board_updated = True
+            elif isinstance(op, DeleteCardOp):
+                delete_card(db, op.card_id, board)
+                board_updated = True
+            elif isinstance(op, MoveCardOp):
+                move_card(db, op.card_id, op.column_id, op.position, board)
+                board_updated = True
+
+    return {"reply": result.reply, "board_updated": board_updated}
 
 
 # --- Board routes ---
