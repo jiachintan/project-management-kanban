@@ -13,25 +13,18 @@ beforeEach(() => {
 
 describe("AIChatSidebar", () => {
   it("renders input and send button", () => {
-    render(<AIChatSidebar onBoardUpdate={() => {}} onClose={() => {}} />);
+    render(<AIChatSidebar onBoardUpdate={() => {}} />);
     expect(screen.getByLabelText("Chat input")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /send message/i })).toBeInTheDocument();
   });
 
   it("renders AI Assistant heading", () => {
-    render(<AIChatSidebar onBoardUpdate={() => {}} onClose={() => {}} />);
+    render(<AIChatSidebar onBoardUpdate={() => {}} />);
     expect(screen.getByText("AI Assistant")).toBeInTheDocument();
   });
 
-  it("calls onClose when close button is clicked", async () => {
-    const onClose = vi.fn();
-    render(<AIChatSidebar onBoardUpdate={() => {}} onClose={onClose} />);
-    await userEvent.click(screen.getByLabelText("Close sidebar"));
-    expect(onClose).toHaveBeenCalled();
-  });
-
   it("sends a message and displays reply", async () => {
-    render(<AIChatSidebar onBoardUpdate={() => {}} onClose={() => {}} />);
+    render(<AIChatSidebar onBoardUpdate={() => {}} />);
     await userEvent.type(screen.getByLabelText("Chat input"), "Create a task");
     await userEvent.click(screen.getByRole("button", { name: /send message/i }));
 
@@ -40,7 +33,7 @@ describe("AIChatSidebar", () => {
   });
 
   it("clears input after sending", async () => {
-    render(<AIChatSidebar onBoardUpdate={() => {}} onClose={() => {}} />);
+    render(<AIChatSidebar onBoardUpdate={() => {}} />);
     const input = screen.getByLabelText("Chat input");
     await userEvent.type(input, "Hello");
     await userEvent.click(screen.getByRole("button", { name: /send message/i }));
@@ -51,7 +44,7 @@ describe("AIChatSidebar", () => {
   it("calls onBoardUpdate when board_updated is true", async () => {
     vi.mocked(api.sendChat).mockResolvedValue({ reply: "Created a card.", board_updated: true });
     const onBoardUpdate = vi.fn();
-    render(<AIChatSidebar onBoardUpdate={onBoardUpdate} onClose={() => {}} />);
+    render(<AIChatSidebar onBoardUpdate={onBoardUpdate} />);
 
     await userEvent.type(screen.getByLabelText("Chat input"), "Add a card");
     await userEvent.click(screen.getByRole("button", { name: /send message/i }));
@@ -61,7 +54,7 @@ describe("AIChatSidebar", () => {
 
   it("does not call onBoardUpdate when board_updated is false", async () => {
     const onBoardUpdate = vi.fn();
-    render(<AIChatSidebar onBoardUpdate={onBoardUpdate} onClose={() => {}} />);
+    render(<AIChatSidebar onBoardUpdate={onBoardUpdate} />);
 
     await userEvent.type(screen.getByLabelText("Chat input"), "Hello");
     await userEvent.click(screen.getByRole("button", { name: /send message/i }));
@@ -76,7 +69,7 @@ describe("AIChatSidebar", () => {
       new Promise((r) => { resolve = r; })
     );
 
-    render(<AIChatSidebar onBoardUpdate={() => {}} onClose={() => {}} />);
+    render(<AIChatSidebar onBoardUpdate={() => {}} />);
     await userEvent.type(screen.getByLabelText("Chat input"), "Hello");
     await userEvent.click(screen.getByRole("button", { name: /send message/i }));
 
@@ -86,7 +79,7 @@ describe("AIChatSidebar", () => {
   });
 
   it("passes conversation history with subsequent messages", async () => {
-    render(<AIChatSidebar onBoardUpdate={() => {}} onClose={() => {}} />);
+    render(<AIChatSidebar onBoardUpdate={() => {}} />);
 
     await userEvent.type(screen.getByLabelText("Chat input"), "First message");
     await userEvent.click(screen.getByRole("button", { name: /send message/i }));

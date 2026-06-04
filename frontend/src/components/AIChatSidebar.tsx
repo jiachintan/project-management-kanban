@@ -7,10 +7,9 @@ type Message = { role: "user" | "assistant"; content: string };
 
 type Props = {
   onBoardUpdate: () => void;
-  onClose: () => void;
 };
 
-export const AIChatSidebar = ({ onBoardUpdate, onClose }: Props) => {
+export const AIChatSidebar = ({ onBoardUpdate }: Props) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -55,19 +54,11 @@ export const AIChatSidebar = ({ onBoardUpdate, onClose }: Props) => {
   };
 
   return (
-    <div className="fixed right-0 top-0 z-50 flex h-full w-80 flex-col border-l border-[var(--stroke)] bg-white shadow-2xl">
-      <div className="flex items-center justify-between border-b border-[var(--stroke)] px-5 py-4">
+    <div className="flex h-screen w-80 shrink-0 flex-col border-l border-[var(--stroke)] bg-white sticky top-0">
+      <div className="border-b border-[var(--stroke)] px-5 py-4">
         <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--navy-dark)]">
           AI Assistant
         </h2>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close sidebar"
-          className="rounded-full p-1 text-[var(--gray-text)] transition hover:text-[var(--navy-dark)]"
-        >
-          ✕
-        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
