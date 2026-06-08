@@ -7,9 +7,10 @@ type Message = { id: string; role: "user" | "assistant"; content: string };
 
 type Props = {
   onBoardUpdate: () => void;
+  boardId?: number;
 };
 
-export const AIChatSidebar = ({ onBoardUpdate }: Props) => {
+export const AIChatSidebar = ({ onBoardUpdate, boardId }: Props) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -35,7 +36,7 @@ export const AIChatSidebar = ({ onBoardUpdate }: Props) => {
     setLoading(true);
 
     try {
-      const result = await api.sendChat(text, history);
+      const result = await api.sendChat(text, history, boardId);
       setMessages((prev) => [
         ...prev,
         { id: crypto.randomUUID(), role: "assistant", content: result.reply || "Done." },

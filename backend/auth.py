@@ -2,6 +2,7 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 
+import bcrypt
 import jwt
 
 _DEFAULT_SECRET = "dev-secret-key-change-in-prod-minimum-32-chars"
@@ -15,8 +16,13 @@ if SECRET_KEY == _DEFAULT_SECRET:
 ALGORITHM = "HS256"
 TOKEN_EXPIRE_HOURS = 24
 
-VALID_USERNAME = "user"
-VALID_PASSWORD = "password"
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+
+def verify_password(plain: str, hashed: str) -> bool:
+    return bcrypt.checkpw(plain.encode(), hashed.encode())
 
 
 def create_token(username: str) -> str:

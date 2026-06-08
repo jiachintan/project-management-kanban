@@ -9,13 +9,19 @@ from sqlalchemy.orm import Session
 
 from ai import ask, chat
 from ai_schema import CreateCardOp, DeleteCardOp, MoveCardOp, UpdateCardOp
-from auth import VALID_PASSWORD, VALID_USERNAME, create_token, verify_token
+from auth import create_token, verify_token
 from crud import (
+    authenticate_user,
     board_to_dict,
+    create_board,
     create_card,
+    delete_board,
     delete_card,
     get_board,
+    list_boards,
     move_card,
+    register_user,
+    rename_board,
     rename_column,
     update_card,
 )
@@ -57,13 +63,29 @@ def health():
     return {"status": "ok"}
 
 
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
+
+
+@app.post("/api/auth/register", status_code=201)
+def register(body: RegisterRequest, db: Session = Depends(get_db)):
+    if len(body.username) < 3 or len(body.password) < 6:
+        raise HTTPException(status_code=422, detail="Username must be at least 3 chars and password at least 6 chars")
+    user = register_user(db, body.username, body.password)
+    if not user:
+        raise HTTPException(status_code=409, detail="Username already taken")
+    return {"username": user.username}
+
+
 @app.post("/api/auth/login")
-def login(body: LoginRequest, response: Response):
-    if body.username != VALID_USERNAME or body.password != VALID_PASSWORD:
+def login(body: LoginRequest, response: Response, db: Session = Depends(get_db)):
+    user = authenticate_user(db, body.username, body.password)
+    if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    token = create_token(body.username)
+    token = create_token(user.username)
     response.set_cookie(COOKIE_NAME, token, httponly=True, samesite="lax", secure=SECURE_COOKIES)
-    return {"username": body.username}
+    return {"username": user.username}
 
 
 @app.post("/api/auth/logout")
@@ -93,6 +115,7 @@ class HistoryMessage(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     history: list[HistoryMessage] = []
+    board_id: int | None = None
 
 
 @app.post("/api/chat")
@@ -101,7 +124,10 @@ def chat_route(
     username: str = Depends(current_user),
     db: Session = Depends(get_db),
 ):
-    board = get_board(db, username)
+    board_id = body.board_id
+    board = get_board(db, username, board_id)
+    if not board:
+        raise HTTPException(status_code=404, detail="Board not found")
     board_dict = board_to_dict(board)
     history = [{"role": m.role, "content": m.content} for m in body.history]
 
@@ -128,9 +154,60 @@ def chat_route(
 
 # --- Board routes ---
 
+@app.get("/api/boards")
+def list_boards_route(username: str = Depends(current_user), db: Session = Depends(get_db)):
+    boards = list_boards(db, username)
+    return [{"id": b.id, "title": b.title} for b in boards]
+
+
+class CreateBoardRequest(BaseModel):
+    title: str
+
+
+@app.post("/api/boards", status_code=201)
+def create_board_route(
+    body: CreateBoardRequest,
+    username: str = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    board = create_board(db, username, body.title)
+    if not board:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"id": board.id, "title": board.title}
+
+
+@app.put("/api/boards/{board_id}")
+def rename_board_route(
+    board_id: int,
+    body: CreateBoardRequest,
+    username: str = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    board = rename_board(db, board_id, body.title, username)
+    if not board:
+        raise HTTPException(status_code=404, detail="Board not found")
+    return {"id": board.id, "title": board.title}
+
+
+@app.delete("/api/boards/{board_id}", status_code=204)
+def delete_board_route(
+    board_id: int,
+    username: str = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    if not delete_board(db, board_id, username):
+        raise HTTPException(status_code=404, detail="Board not found")
+
+
 @app.get("/api/board")
-def get_board_route(username: str = Depends(current_user), db: Session = Depends(get_db)):
-    board = get_board(db, username)
+def get_board_route(
+    board_id: int | None = None,
+    username: str = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    board = get_board(db, username, board_id)
+    if not board:
+        raise HTTPException(status_code=404, detail="Board not found")
     return board_to_dict(board)
 
 

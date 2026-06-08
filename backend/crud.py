@@ -1,20 +1,35 @@
 from sqlalchemy.orm import Session, selectinload
 
+from auth import hash_password, verify_password
 from models import Board, Card, Column, User
 
 SEED_COLUMNS = ["Backlog", "Discovery", "In Progress", "Review", "Done"]
 
 
-def get_or_create_user(db: Session, username: str) -> User:
-    # NOTE: creates a new user row on first call for a given username.
-    # Any valid JWT for an unknown username will silently produce a new user.
+def register_user(db: Session, username: str, password: str) -> User | None:
+    if db.query(User).filter(User.username == username).first():
+        return None
+    user = User(username=username, password_hash=hash_password(password))
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def authenticate_user(db: Session, username: str, password: str) -> User | None:
     user = db.query(User).filter(User.username == username).first()
     if not user:
-        user = User(username=username)
-        db.add(user)
-        db.commit()
-        db.refresh(user)
+        return None
+    # Legacy: users without password_hash (seeded via old path) cannot log in
+    if not user.password_hash:
+        return None
+    if not verify_password(password, user.password_hash):
+        return None
     return user
+
+
+def get_user(db: Session, username: str) -> User | None:
+    return db.query(User).filter(User.username == username).first()
 
 
 def _board_query(db: Session):
@@ -23,22 +38,70 @@ def _board_query(db: Session):
     )
 
 
-def get_or_create_board(db: Session, user: User) -> Board:
-    board = _board_query(db).filter(Board.user_id == user.id).first()
+def _seed_board(db: Session, board: Board) -> Board:
+    for i, title in enumerate(SEED_COLUMNS):
+        db.add(Column(board_id=board.id, title=title, position=i))
+    db.commit()
+    return _board_query(db).filter(Board.id == board.id).first()
+
+
+def list_boards(db: Session, username: str) -> list[Board]:
+    user = get_user(db, username)
+    if not user:
+        return []
+    return _board_query(db).filter(Board.user_id == user.id).order_by(Board.id).all()
+
+
+def create_board(db: Session, username: str, title: str) -> Board | None:
+    user = get_user(db, username)
+    if not user:
+        return None
+    board = Board(user_id=user.id, title=title)
+    db.add(board)
+    db.flush()
+    return _seed_board(db, board)
+
+
+def rename_board(db: Session, board_id: int, title: str, username: str) -> Board | None:
+    user = get_user(db, username)
+    if not user:
+        return None
+    board = db.query(Board).filter(Board.id == board_id, Board.user_id == user.id).first()
+    if not board:
+        return None
+    board.title = title
+    db.commit()
+    db.refresh(board)
+    return board
+
+
+def delete_board(db: Session, board_id: int, username: str) -> bool:
+    user = get_user(db, username)
+    if not user:
+        return False
+    board = db.query(Board).filter(Board.id == board_id, Board.user_id == user.id).first()
+    if not board:
+        return False
+    db.delete(board)
+    db.commit()
+    return True
+
+
+def get_board(db: Session, username: str, board_id: int | None = None) -> Board | None:
+    user = get_user(db, username)
+    if not user:
+        return None
+    if board_id is not None:
+        board = _board_query(db).filter(Board.id == board_id, Board.user_id == user.id).first()
+        return board
+    # Return the first board, creating one if none exist
+    board = _board_query(db).filter(Board.user_id == user.id).order_by(Board.id).first()
     if not board:
         board = Board(user_id=user.id, title="My Board")
         db.add(board)
         db.flush()
-        for i, title in enumerate(SEED_COLUMNS):
-            db.add(Column(board_id=board.id, title=title, position=i))
-        db.commit()
-        board = _board_query(db).filter(Board.id == board.id).first()
+        board = _seed_board(db, board)
     return board
-
-
-def get_board(db: Session, username: str) -> Board:
-    user = get_or_create_user(db, username)
-    return get_or_create_board(db, user)
 
 
 def board_to_dict(board: Board) -> dict:
