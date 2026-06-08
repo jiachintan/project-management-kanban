@@ -16,6 +16,6 @@ set ENV_FLAG=
 if exist .env set ENV_FLAG=--env-file .env
 
 echo Starting container...
-docker run -d --name %CONTAINER_NAME% -p 8000:8000 %ENV_FLAG% %IMAGE_NAME%
+docker run -d --name %CONTAINER_NAME% -p 8000:8000 %ENV_FLAG% -v pm-app-data:/app/data -e DB_PATH=/app/data/pm.db %IMAGE_NAME%
 
 echo App running at http://localhost:8000

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -62,6 +62,18 @@ export const KanbanBoard = ({ onLogout }: KanbanBoardProps) => {
   const [creatingBoard, setCreatingBoard] = useState(false);
   const [editingBoardTitle, setEditingBoardTitle] = useState(false);
   const [editBoardValue, setEditBoardValue] = useState("");
+  const boardMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showBoardMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (boardMenuRef.current && !boardMenuRef.current.contains(e.target as Node)) {
+        setShowBoardMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showBoardMenu]);
 
   const loadBoards = useCallback(async () => {
     try {
@@ -307,7 +319,7 @@ export const KanbanBoard = ({ onLogout }: KanbanBoardProps) => {
               </div>
               <div className="flex items-center gap-3">
                 {/* Board switcher */}
-                <div className="relative z-50">
+                <div className="relative" ref={boardMenuRef}>
                   <button
                     type="button"
                     onClick={() => setShowBoardMenu((v) => !v)}
@@ -447,13 +459,6 @@ export const KanbanBoard = ({ onLogout }: KanbanBoardProps) => {
       </div>
       <AIChatSidebar onBoardUpdate={() => loadBoard(boardId ?? undefined)} boardId={boardId ?? undefined} />
 
-      {/* Backdrop for board menu */}
-      {showBoardMenu && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setShowBoardMenu(false)}
-        />
-      )}
     </div>
   );
 };
