@@ -8,6 +8,7 @@ const mockReplace = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush, replace: mockReplace }),
+  useSearchParams: () => ({ get: () => null }),
 }));
 
 describe("LoginPage", () => {

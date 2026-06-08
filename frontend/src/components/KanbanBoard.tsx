@@ -307,7 +307,7 @@ export const KanbanBoard = ({ onLogout }: KanbanBoardProps) => {
               </div>
               <div className="flex items-center gap-3">
                 {/* Board switcher */}
-                <div className="relative">
+                <div className="relative z-50">
                   <button
                     type="button"
                     onClick={() => setShowBoardMenu((v) => !v)}

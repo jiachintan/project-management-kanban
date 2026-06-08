@@ -18,6 +18,7 @@ from crud import (
     delete_board,
     delete_card,
     get_board,
+    get_user,
     list_boards,
     move_card,
     register_user,
@@ -47,12 +48,14 @@ class LoginRequest(BaseModel):
     password: str
 
 
-def current_user(session: str | None = Cookie(default=None)) -> str:
+def current_user(session: str | None = Cookie(default=None), db: Session = Depends(get_db)) -> str:
     if not session:
         raise HTTPException(status_code=401, detail="Not authenticated")
     username = verify_token(session)
     if not username:
         raise HTTPException(status_code=401, detail="Invalid session")
+    if not get_user(db, username):
+        raise HTTPException(status_code=401, detail="User not found")
     return username
 
 

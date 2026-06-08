@@ -27,6 +27,7 @@ const mockBoard: api.ApiBoard = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(api.listBoards).mockResolvedValue([{ id: 1, title: "My Board" }]);
   vi.mocked(api.getBoard).mockResolvedValue(mockBoard);
   vi.mocked(api.renameColumn).mockResolvedValue(undefined);
   vi.mocked(api.createCard).mockResolvedValue({
