@@ -50,6 +50,7 @@ _UPDATE_BOARD_TOOL = {
 def get_client() -> anthropic.Anthropic:
     global _client
     if _client is None:
+        # Uses CLAUDE_API_KEY (non-standard name; the SDK default is ANTHROPIC_API_KEY)
         api_key = os.environ.get("CLAUDE_API_KEY")
         _client = anthropic.Anthropic(api_key=api_key)
     return _client
@@ -95,15 +96,18 @@ def chat(message: str, history: list[dict], board: dict) -> ChatResponse:
         elif block.type == "tool_use" and block.name == "update_board":
             ops = []
             for op_data in block.input.get("operations", []):
-                op_type = op_data.get("op")
-                if op_type == "create_card":
-                    ops.append(CreateCardOp(**op_data))
-                elif op_type == "update_card":
-                    ops.append(UpdateCardOp(**op_data))
-                elif op_type == "delete_card":
-                    ops.append(DeleteCardOp(**op_data))
-                elif op_type == "move_card":
-                    ops.append(MoveCardOp(**op_data))
+                try:
+                    op_type = op_data.get("op")
+                    if op_type == "create_card":
+                        ops.append(CreateCardOp(**op_data))
+                    elif op_type == "update_card":
+                        ops.append(UpdateCardOp(**op_data))
+                    elif op_type == "delete_card":
+                        ops.append(DeleteCardOp(**op_data))
+                    elif op_type == "move_card":
+                        ops.append(MoveCardOp(**op_data))
+                except Exception:
+                    pass  # skip malformed operations from Claude
             if ops:
                 board_update = BoardUpdate(operations=ops)
 

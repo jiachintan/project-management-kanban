@@ -22,6 +22,10 @@ export default function Home() {
     router.replace("/login");
   };
 
-  if (!authed) return null;
+  if (!authed) return (
+    <div className="flex min-h-screen items-center justify-center">
+      <p className="text-sm text-[#888888]">Loading...</p>
+    </div>
+  );
   return <KanbanBoard onLogout={handleLogout} />;
 }

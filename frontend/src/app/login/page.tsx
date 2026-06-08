@@ -16,17 +16,21 @@ export default function LoginPage() {
     const username = (form.elements.namedItem("username") as HTMLInputElement).value;
     const password = (form.elements.namedItem("password") as HTMLInputElement).value;
 
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
-
-    setLoading(false);
-    if (res.ok) {
-      router.push("/");
-    } else {
-      setError("Invalid username or password.");
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      if (res.ok) {
+        router.push("/");
+      } else {
+        setError("Invalid username or password.");
+      }
+    } catch {
+      setError("Connection error. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -8,6 +8,8 @@ import {
   useSensor,
   useSensors,
   closestCorners,
+  pointerWithin,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
@@ -53,20 +55,26 @@ export const KanbanBoard = ({ onLogout }: KanbanBoardProps) => {
   const [error, setError] = useState<string | null>(null);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
 
-  const loadBoard = () => {
+  const loadBoard = useCallback(() => {
     api
       .getBoard()
       .then((data) => setBoard(apiBoardToLocal(data)))
       .catch(() => setError("Failed to load board"));
-  };
+  }, []);
 
   useEffect(() => {
     loadBoard();
-  }, []);
+  }, [loadBoard]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   );
+
+  const collisionDetection: CollisionDetection = useCallback((args) => {
+    const pointerCollisions = pointerWithin(args);
+    if (pointerCollisions.length > 0) return pointerCollisions;
+    return closestCorners(args);
+  }, []);
 
   const cardsById = useMemo(() => board?.cards ?? {}, [board]);
 
@@ -109,7 +117,7 @@ export const KanbanBoard = ({ onLogout }: KanbanBoardProps) => {
   };
 
   const handleRenameColumnCommit = (columnId: string, title: string) => {
-    api.renameColumn(parseColId(columnId), title).catch(() => {});
+    api.renameColumn(parseColId(columnId), title).catch(() => loadBoard());
   };
 
   const handleAddCard = async (
@@ -117,43 +125,51 @@ export const KanbanBoard = ({ onLogout }: KanbanBoardProps) => {
     title: string,
     details: string
   ) => {
-    const card = await api.createCard(parseColId(columnId), title, details);
-    const id = cardKey(card.id);
-    setBoard((prev) =>
-      prev
-        ? {
-            ...prev,
-            cards: {
-              ...prev.cards,
-              [id]: { id, title: card.title, details: card.details },
-            },
-            columns: prev.columns.map((col) =>
-              col.id === columnId
-                ? { ...col, cardIds: [...col.cardIds, id] }
-                : col
-            ),
-          }
-        : prev
-    );
+    try {
+      const card = await api.createCard(parseColId(columnId), title, details);
+      const id = cardKey(card.id);
+      setBoard((prev) =>
+        prev
+          ? {
+              ...prev,
+              cards: {
+                ...prev.cards,
+                [id]: { id, title: card.title, details: card.details },
+              },
+              columns: prev.columns.map((col) =>
+                col.id === columnId
+                  ? { ...col, cardIds: [...col.cardIds, id] }
+                  : col
+              ),
+            }
+          : prev
+      );
+    } catch {
+      setError("Failed to add card");
+    }
   };
 
   const handleDeleteCard = async (columnId: string, cardId: string) => {
-    await api.deleteCard(parseCardId(cardId));
-    setBoard((prev) =>
-      prev
-        ? {
-            ...prev,
-            cards: Object.fromEntries(
-              Object.entries(prev.cards).filter(([id]) => id !== cardId)
-            ),
-            columns: prev.columns.map((col) =>
-              col.id === columnId
-                ? { ...col, cardIds: col.cardIds.filter((id) => id !== cardId) }
-                : col
-            ),
-          }
-        : prev
-    );
+    try {
+      await api.deleteCard(parseCardId(cardId));
+      setBoard((prev) =>
+        prev
+          ? {
+              ...prev,
+              cards: Object.fromEntries(
+                Object.entries(prev.cards).filter(([id]) => id !== cardId)
+              ),
+              columns: prev.columns.map((col) =>
+                col.id === columnId
+                  ? { ...col, cardIds: col.cardIds.filter((id) => id !== cardId) }
+                  : col
+              ),
+            }
+          : prev
+      );
+    } catch {
+      setError("Failed to delete card");
+    }
   };
 
   const activeCard = activeCardId ? cardsById[activeCardId] : null;
@@ -229,7 +245,7 @@ export const KanbanBoard = ({ onLogout }: KanbanBoardProps) => {
 
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCorners}
+          collisionDetection={collisionDetection}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >

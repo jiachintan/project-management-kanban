@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Response
 from fastapi.responses import HTMLResponse
@@ -20,14 +21,17 @@ from crud import (
 )
 from database import get_db, init_db
 
-app = FastAPI()
-
 COOKIE_NAME = "session"
+SECURE_COOKIES = os.getenv("SECURE_COOKIES", "false").lower() == "true"
 
 
-@app.on_event("startup")
-def startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     init_db()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 # --- Auth helpers ---
@@ -58,7 +62,7 @@ def login(body: LoginRequest, response: Response):
     if body.username != VALID_USERNAME or body.password != VALID_PASSWORD:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     token = create_token(body.username)
-    response.set_cookie(COOKIE_NAME, token, httponly=True, samesite="lax")
+    response.set_cookie(COOKIE_NAME, token, httponly=True, samesite="lax", secure=SECURE_COOKIES)
     return {"username": body.username}
 
 
@@ -76,7 +80,7 @@ def me(username: str = Depends(current_user)):
 # --- AI routes ---
 
 @app.post("/api/ai/test")
-def ai_test():
+def ai_test(username: str = Depends(current_user)):
     response = ask("What is 2+2?")
     return {"response": response}
 

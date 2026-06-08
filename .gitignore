@@ -178,6 +178,8 @@ cython_debug/
 backend/static/
 backend/.venv/
 backend/.pytest_cache/
+backend/pm.db
+*.db
 
 # Playwright test results
 frontend/test-results/

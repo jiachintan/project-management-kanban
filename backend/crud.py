@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from models import Board, Card, Column, User
 
@@ -6,6 +6,8 @@ SEED_COLUMNS = ["Backlog", "Discovery", "In Progress", "Review", "Done"]
 
 
 def get_or_create_user(db: Session, username: str) -> User:
+    # NOTE: creates a new user row on first call for a given username.
+    # Any valid JWT for an unknown username will silently produce a new user.
     user = db.query(User).filter(User.username == username).first()
     if not user:
         user = User(username=username)
@@ -15,8 +17,14 @@ def get_or_create_user(db: Session, username: str) -> User:
     return user
 
 
+def _board_query(db: Session):
+    return db.query(Board).options(
+        selectinload(Board.columns).selectinload(Column.cards)
+    )
+
+
 def get_or_create_board(db: Session, user: User) -> Board:
-    board = db.query(Board).filter(Board.user_id == user.id).first()
+    board = _board_query(db).filter(Board.user_id == user.id).first()
     if not board:
         board = Board(user_id=user.id, title="My Board")
         db.add(board)
@@ -24,7 +32,7 @@ def get_or_create_board(db: Session, user: User) -> Board:
         for i, title in enumerate(SEED_COLUMNS):
             db.add(Column(board_id=board.id, title=title, position=i))
         db.commit()
-        db.refresh(board)
+        board = _board_query(db).filter(Board.id == board.id).first()
     return board
 
 
@@ -52,7 +60,7 @@ def board_to_dict(board: Board) -> dict:
     }
 
 
-def rename_column(db: Session, column_id: int, title: str, board: Board) -> Column:
+def rename_column(db: Session, column_id: int, title: str, board: Board) -> Column | None:
     col = db.query(Column).filter(Column.id == column_id, Column.board_id == board.id).first()
     if not col:
         return None

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as api from "@/lib/api";
 
-type Message = { role: "user" | "assistant"; content: string };
+type Message = { id: string; role: "user" | "assistant"; content: string };
 
 type Props = {
   onBoardUpdate: () => void;
@@ -24,7 +24,7 @@ export const AIChatSidebar = ({ onBoardUpdate }: Props) => {
     const text = input.trim();
     if (!text || loading) return;
 
-    const userMsg: Message = { role: "user", content: text };
+    const userMsg: Message = { id: crypto.randomUUID(), role: "user", content: text };
     const history: api.ChatMessage[] = messages.map((m) => ({
       role: m.role,
       content: m.content,
@@ -38,7 +38,7 @@ export const AIChatSidebar = ({ onBoardUpdate }: Props) => {
       const result = await api.sendChat(text, history);
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: result.reply || "Done." },
+        { id: crypto.randomUUID(), role: "assistant", content: result.reply || "Done." },
       ]);
       if (result.board_updated) {
         onBoardUpdate();
@@ -46,7 +46,7 @@ export const AIChatSidebar = ({ onBoardUpdate }: Props) => {
     } catch {
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "Something went wrong. Please try again." },
+        { id: crypto.randomUUID(), role: "assistant", content: "Something went wrong. Please try again." },
       ]);
     } finally {
       setLoading(false);
@@ -67,9 +67,9 @@ export const AIChatSidebar = ({ onBoardUpdate }: Props) => {
             Ask me to create, move, or edit cards on your board.
           </p>
         )}
-        {messages.map((msg, i) => (
+        {messages.map((msg) => (
           <div
-            key={i}
+            key={msg.id}
             className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
           >
             <div

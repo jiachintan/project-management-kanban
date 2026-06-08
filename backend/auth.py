@@ -1,9 +1,17 @@
+import logging
 import os
 from datetime import datetime, timedelta, timezone
 
 import jwt
 
-SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-prod-minimum-32-chars")
+_DEFAULT_SECRET = "dev-secret-key-change-in-prod-minimum-32-chars"
+SECRET_KEY = os.getenv("SECRET_KEY", _DEFAULT_SECRET)
+
+if SECRET_KEY == _DEFAULT_SECRET:
+    logging.warning(
+        "SECRET_KEY is using the insecure default value. "
+        "Set SECRET_KEY in your environment before deploying."
+    )
 ALGORITHM = "HS256"
 TOKEN_EXPIRE_HOURS = 24
 
