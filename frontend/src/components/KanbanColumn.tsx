@@ -28,8 +28,8 @@ export const KanbanColumn = ({
     <section
       ref={setNodeRef}
       className={clsx(
-        "flex min-h-[520px] flex-col rounded-3xl border border-[var(--stroke)] bg-[var(--surface-strong)] p-4 shadow-[var(--shadow)] transition",
-        isOver && "ring-2 ring-[var(--accent-yellow)]"
+        "flex min-h-[520px] flex-col rounded-3xl border-2 border-[var(--stroke)] bg-[var(--surface-strong)] p-4 shadow-[0_4px_16px_rgba(3,33,71,0.10)] transition",
+        isOver && "ring-2 ring-[var(--accent-yellow)] border-[var(--accent-yellow)]"
       )}
       data-testid={`column-${column.id}`}
     >

@@ -54,8 +54,8 @@ export const AIChatSidebar = ({ onBoardUpdate }: Props) => {
   };
 
   return (
-    <div className="flex h-screen w-80 shrink-0 flex-col border-l border-[var(--stroke)] bg-white sticky top-0">
-      <div className="border-b border-[var(--stroke)] px-5 py-4">
+    <div className="flex h-screen w-80 shrink-0 flex-col border-l-2 border-[var(--stroke)] bg-white sticky top-0">
+      <div className="border-b-2 border-[var(--stroke)] px-5 py-4">
         <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--navy-dark)]">
           AI Assistant
         </h2>
@@ -95,7 +95,7 @@ export const AIChatSidebar = ({ onBoardUpdate }: Props) => {
 
       <form
         onSubmit={handleSubmit}
-        className="flex gap-2 border-t border-[var(--stroke)] px-4 py-3"
+        className="flex gap-2 border-t-2 border-[var(--stroke)] px-4 py-3"
       >
         <input
           type="text"

@@ -36,7 +36,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--surface)]">
-      <div className="w-full max-w-sm rounded-3xl border border-[var(--stroke)] bg-white p-8 shadow-[var(--shadow)]">
+      <div className="w-full max-w-sm rounded-3xl border-2 border-[var(--stroke)] bg-white p-8 shadow-[var(--shadow)]">
         <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[var(--gray-text)]">
           Project Management
         </p>
@@ -56,7 +56,7 @@ export default function LoginPage() {
               name="username"
               type="text"
               required
-              className="mt-2 w-full rounded-xl border border-[var(--stroke)] bg-white px-3 py-2 text-sm font-medium text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)]"
+              className="mt-2 w-full rounded-xl border-2 border-[var(--stroke)] bg-white px-3 py-2 text-sm font-medium text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)]"
             />
           </div>
           <div>
@@ -71,7 +71,7 @@ export default function LoginPage() {
               name="password"
               type="password"
               required
-              className="mt-2 w-full rounded-xl border border-[var(--stroke)] bg-white px-3 py-2 text-sm font-medium text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)]"
+              className="mt-2 w-full rounded-xl border-2 border-[var(--stroke)] bg-white px-3 py-2 text-sm font-medium text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)]"
             />
           </div>
           {error && (
