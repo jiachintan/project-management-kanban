@@ -1,8 +1,6 @@
 from unittest.mock import MagicMock, patch
 
-import pytest
-
-from ai_schema import BoardUpdate, ChatResponse, CreateCardOp, DeleteCardOp, MoveCardOp, UpdateCardOp
+from ai_schema import CreateCardOp
 
 
 def _make_text_block(text):

@@ -18,10 +18,7 @@ def register_user(db: Session, username: str, password: str) -> User | None:
 
 def authenticate_user(db: Session, username: str, password: str) -> User | None:
     user = db.query(User).filter(User.username == username).first()
-    if not user:
-        return None
-    # Legacy: users without password_hash (seeded via old path) cannot log in
-    if not user.password_hash:
+    if not user or not user.password_hash:
         return None
     if not verify_password(password, user.password_hash):
         return None
@@ -92,8 +89,7 @@ def get_board(db: Session, username: str, board_id: int | None = None) -> Board 
     if not user:
         return None
     if board_id is not None:
-        board = _board_query(db).filter(Board.id == board_id, Board.user_id == user.id).first()
-        return board
+        return _board_query(db).filter(Board.id == board_id, Board.user_id == user.id).first()
     # Return the first board, creating one if none exist
     board = _board_query(db).filter(Board.user_id == user.id).order_by(Board.id).first()
     if not board:

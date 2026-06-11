@@ -41,9 +41,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-# --- Auth helpers ---
-
-class LoginRequest(BaseModel):
+class CredentialsRequest(BaseModel):
     username: str
     password: str
 
@@ -59,20 +57,13 @@ def current_user(session: str | None = Cookie(default=None), db: Session = Depen
     return username
 
 
-# --- Auth routes ---
-
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
 
 
-class RegisterRequest(BaseModel):
-    username: str
-    password: str
-
-
 @app.post("/api/auth/register", status_code=201)
-def register(body: RegisterRequest, db: Session = Depends(get_db)):
+def register(body: CredentialsRequest, db: Session = Depends(get_db)):
     if len(body.username) < 3 or len(body.password) < 6:
         raise HTTPException(status_code=422, detail="Username must be at least 3 chars and password at least 6 chars")
     user = register_user(db, body.username, body.password)
@@ -82,7 +73,7 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
 
 
 @app.post("/api/auth/login")
-def login(body: LoginRequest, response: Response, db: Session = Depends(get_db)):
+def login(body: CredentialsRequest, response: Response, db: Session = Depends(get_db)):
     user = authenticate_user(db, body.username, body.password)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -101,8 +92,6 @@ def logout(response: Response):
 def me(username: str = Depends(current_user)):
     return {"username": username}
 
-
-# --- AI routes ---
 
 @app.post("/api/ai/test")
 def ai_test(username: str = Depends(current_user)):
@@ -136,26 +125,21 @@ def chat_route(
 
     result = chat(body.message, history, board_dict)
 
-    board_updated = False
-    if result.board_update:
-        for op in result.board_update.operations:
-            if isinstance(op, CreateCardOp):
-                create_card(db, op.column_id, op.title, op.details, board)
-                board_updated = True
-            elif isinstance(op, UpdateCardOp):
-                update_card(db, op.card_id, op.title, op.details, board)
-                board_updated = True
-            elif isinstance(op, DeleteCardOp):
-                delete_card(db, op.card_id, board)
-                board_updated = True
-            elif isinstance(op, MoveCardOp):
-                move_card(db, op.card_id, op.column_id, op.position, board)
-                board_updated = True
+    if not result.board_update:
+        return {"reply": result.reply, "board_updated": False}
 
-    return {"reply": result.reply, "board_updated": board_updated}
+    for op in result.board_update.operations:
+        if isinstance(op, CreateCardOp):
+            create_card(db, op.column_id, op.title, op.details, board)
+        elif isinstance(op, UpdateCardOp):
+            update_card(db, op.card_id, op.title, op.details, board)
+        elif isinstance(op, DeleteCardOp):
+            delete_card(db, op.card_id, board)
+        elif isinstance(op, MoveCardOp):
+            move_card(db, op.card_id, op.column_id, op.position, board)
 
+    return {"reply": result.reply, "board_updated": True}
 
-# --- Board routes ---
 
 @app.get("/api/boards")
 def list_boards_route(username: str = Depends(current_user), db: Session = Depends(get_db)):
@@ -163,13 +147,13 @@ def list_boards_route(username: str = Depends(current_user), db: Session = Depen
     return [{"id": b.id, "title": b.title} for b in boards]
 
 
-class CreateBoardRequest(BaseModel):
+class TitleRequest(BaseModel):
     title: str
 
 
 @app.post("/api/boards", status_code=201)
 def create_board_route(
-    body: CreateBoardRequest,
+    body: TitleRequest,
     username: str = Depends(current_user),
     db: Session = Depends(get_db),
 ):
@@ -182,7 +166,7 @@ def create_board_route(
 @app.put("/api/boards/{board_id}")
 def rename_board_route(
     board_id: int,
-    body: CreateBoardRequest,
+    body: TitleRequest,
     username: str = Depends(current_user),
     db: Session = Depends(get_db),
 ):
@@ -214,14 +198,10 @@ def get_board_route(
     return board_to_dict(board)
 
 
-class RenameColumnRequest(BaseModel):
-    title: str
-
-
 @app.put("/api/board/columns/{column_id}")
 def rename_column_route(
     column_id: int,
-    body: RenameColumnRequest,
+    body: TitleRequest,
     username: str = Depends(current_user),
     db: Session = Depends(get_db),
 ):
@@ -299,8 +279,6 @@ def move_card_route(
         raise HTTPException(status_code=404, detail="Card or column not found")
     return {"id": card.id, "column_id": card.column_id, "position": card.position}
 
-
-# --- Static file serving ---
 
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 

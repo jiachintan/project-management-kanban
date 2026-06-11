@@ -85,27 +85,20 @@ export const KanbanBoard = ({ onLogout }: KanbanBoardProps) => {
     }
   }, []);
 
-  const loadBoard = useCallback(
-    (id?: number) => {
-      api
-        .getBoard(id)
-        .then((data) => {
-          setBoard(apiBoardToLocal(data));
-          setBoardId(data.id);
-          setBoardTitle(data.title);
-        })
-        .catch(() => setError("Failed to load board"));
-    },
-    []
-  );
+  const loadBoard = useCallback(async (id?: number) => {
+    try {
+      const data = await api.getBoard(id);
+      setBoard(apiBoardToLocal(data));
+      setBoardId(data.id);
+      setBoardTitle(data.title);
+    } catch {
+      setError("Failed to load board");
+    }
+  }, []);
 
   useEffect(() => {
     loadBoards().then((list) => {
-      if (list.length > 0) {
-        loadBoard(list[0].id);
-      } else {
-        loadBoard();
-      }
+      loadBoard(list[0]?.id);
     });
   }, [loadBoards, loadBoard]);
 

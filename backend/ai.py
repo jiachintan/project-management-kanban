@@ -4,18 +4,18 @@ import os
 import anthropic
 from dotenv import load_dotenv
 
-from ai_schema import (
-    BoardUpdate,
-    ChatResponse,
-    CreateCardOp,
-    DeleteCardOp,
-    MoveCardOp,
-    UpdateCardOp,
-)
+from ai_schema import BoardUpdate, ChatResponse, CreateCardOp, DeleteCardOp, MoveCardOp, UpdateCardOp
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 _client: anthropic.Anthropic | None = None
+
+_OP_MODELS = {
+    "create_card": CreateCardOp,
+    "update_card": UpdateCardOp,
+    "delete_card": DeleteCardOp,
+    "move_card": MoveCardOp,
+}
 
 _UPDATE_BOARD_TOOL = {
     "name": "update_board",
@@ -96,18 +96,13 @@ def chat(message: str, history: list[dict], board: dict) -> ChatResponse:
         elif block.type == "tool_use" and block.name == "update_board":
             ops = []
             for op_data in block.input.get("operations", []):
+                model = _OP_MODELS.get(op_data.get("op"))
+                if not model:
+                    continue
                 try:
-                    op_type = op_data.get("op")
-                    if op_type == "create_card":
-                        ops.append(CreateCardOp(**op_data))
-                    elif op_type == "update_card":
-                        ops.append(UpdateCardOp(**op_data))
-                    elif op_type == "delete_card":
-                        ops.append(DeleteCardOp(**op_data))
-                    elif op_type == "move_card":
-                        ops.append(MoveCardOp(**op_data))
+                    ops.append(model(**op_data))
                 except Exception:
-                    pass  # skip malformed operations from Claude
+                    continue
             if ops:
                 board_update = BoardUpdate(operations=ops)
 
